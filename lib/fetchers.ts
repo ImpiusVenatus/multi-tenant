@@ -12,7 +12,7 @@ export async function getSiteData(domain: string) {
 
   return await unstable_cache(
     async () => {
-      return await db.query.sites.findFirst({
+      const siteData = await db.query.sites.findFirst({
         where: subdomain
           ? eq(sites.subdomain, subdomain)
           : eq(sites.customDomain, domain),
@@ -20,6 +20,9 @@ export async function getSiteData(domain: string) {
           user: true,
         },
       });
+      
+      console.log('siteData:', siteData);
+      return siteData || {};
     },
     [`${domain}-metadata`],
     {
@@ -29,6 +32,7 @@ export async function getSiteData(domain: string) {
   )();
 }
 
+
 export async function getPostsForSite(domain: string) {
   const subdomain = domain.endsWith(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`)
     ? domain.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`, "")
@@ -36,7 +40,7 @@ export async function getPostsForSite(domain: string) {
 
   return await unstable_cache(
     async () => {
-      return await db
+      const postsData = await db
         .select({
           title: posts.title,
           description: posts.description,
@@ -56,6 +60,9 @@ export async function getPostsForSite(domain: string) {
           ),
         )
         .orderBy(desc(posts.createdAt));
+      
+      console.log('postsData:', postsData);
+      return postsData || [];
     },
     [`${domain}-posts`],
     {
@@ -130,6 +137,10 @@ export async function getPostData(domain: string, slug: string) {
           ),
       ]);
 
+      console.log('postData:', data);
+      console.log('mdxSource:', mdxSource);
+      console.log('adjacentPosts:', adjacentPosts);
+
       return {
         ...data,
         mdxSource,
@@ -145,16 +156,15 @@ export async function getPostData(domain: string, slug: string) {
 }
 
 async function getMdxSource(postContents: string) {
-  // transforms links like <link> to [link](link) as MDX doesn't support <link> syntax
-  // https://mdxjs.com/docs/what-is-mdx/#markdown
   const content =
     postContents?.replaceAll(/<(https?:\/\/\S+)>/g, "[$1]($1)") ?? "";
-  // Serialize the content string into MDX
   const mdxSource = await serialize(content, {
     mdxOptions: {
       remarkPlugins: [replaceTweets, () => replaceExamples(db)],
     },
   });
 
+  console.log('mdxSourceContent:', content);
   return mdxSource;
 }
+
